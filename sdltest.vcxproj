@@ -24,6 +24,7 @@
     <ProjectGuid>{457d87ee-86f1-4e79-b8d5-b72e339effa7}</ProjectGuid>
     <RootNamespace>sdltest</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>client</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
