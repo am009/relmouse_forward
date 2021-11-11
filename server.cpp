@@ -17,13 +17,12 @@ bool config_debug = false;
 int main(int argc, char* argv[])
 {
 	if (argc < 2) {
-		printf("please input IP address as argument.");
+		printf("please input IP address as argument.\n");
 		return 0;
 	}
 	config_server_name = argv[1];
-	printf("server addr: %s", config_server_name);
+	printf("server addr: %s\n", config_server_name);
 
-	std::cout << "Hello World!\n";
 	winsock_init();
 	sdlmsg_replay_init(NULL);
 	pthread_t serverthread;

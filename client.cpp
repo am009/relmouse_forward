@@ -5,6 +5,7 @@
 #include <map>
 #include <pthread.h>
 #include <SDL.h>
+#include <SDL_syswm.h>
 #include "ctrl-sdl.h"
 #include "controller.h"
 
@@ -16,6 +17,7 @@ USHORT config_ctrlport = 8555;
 const char* config_server_name = "127.0.0.1";
 const char* config_log_file = NULL;
 bool config_debug = true;
+float config_opacity = 0.2f;
 
 bool config_full_screen = false;
 bool config_relative_mouse = true;
@@ -31,14 +33,14 @@ SDL_Window* window = NULL;
 extern "C" int SDL_main(int argc, char* argv[])
 {
 	if (argc < 2) {
-		printf("please input IP address as argument.");
+		printf("please input IP address as argument.\n");
 		return 0;
 	}
 	config_server_name = argv[1];
-	printf("server addr: %s", config_server_name);
+	printf("server addr: %s\n", config_server_name);
 
+	ga_set_process_dpi_aware();
 	winsock_init();
-    std::cout << "Hello World!\n";
 	// Pointers to our window and surface
 	SDL_Surface* winSurface = NULL;
 	pthread_t ctrlthread;
@@ -73,31 +75,37 @@ extern "C" int SDL_main(int argc, char* argv[])
 		wflag |= SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_BORDERLESS;
 	}
 	// Create our window
-	window = SDL_CreateWindow("Controler", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 280, 100, wflag );
+	window = SDL_CreateWindow("Controler", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 280, 150, wflag );
 
 	// Make sure creating the window succeeded
 	if (!window) {
 		std::cout << "Error creating window: " << SDL_GetError() << std::endl;
-		system("pause");
 		// End the program
 		return 1;
 	}
 
-	if (config_relative_mouse) {
-		SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_MODE_WARP, "1"); // WRAP MOUSE
-		SDL_SetRelativeMouseMode(SDL_TRUE);
-		showCursor = 0;
-	}
-
-	// Get the surface from the window
+	//// Get the surface from the window
 	winSurface = SDL_GetWindowSurface(window);
 
-	// Make sure getting the surface succeeded
+	//// Make sure getting the surface succeeded
 	if (!winSurface) {
 		std::cout << "Error getting surface: " << SDL_GetError() << std::endl;
-		system("pause");
-		// End the program
 		return 1;
+	}
+
+	// Fill the window with a white rectangle
+	SDL_FillRect(winSurface, NULL, SDL_MapRGB(winSurface->format, 255, 255, 255));
+
+	SDL_SetWindowOpacity(window, config_opacity);
+
+	// Update the window display
+	SDL_UpdateWindowSurface(window);
+
+
+	if (config_relative_mouse) {
+		// SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_MODE_WARP, "1"); // WRAP MOUSE
+		SDL_SetRelativeMouseMode(SDL_TRUE);
+		showCursor = 0;
 	}
 
 	SDL_Event e;
@@ -225,7 +233,7 @@ ProcessEvent(SDL_Event* event) {
 	case SDL_MOUSEMOTION:
 		if (!showCursor) {
 			if (config_debug) {
-				printf("before: %d, after: %d\n", event->motion.xrel, scale_mouseX(event->motion.xrel));
+				printf("xrel: %d, xrel-s: %d, yrel: %d, yrel-s: %d\n", event->motion.xrel, scale_mouseX(event->motion.xrel), event->motion.yrel, scale_mouseY(event->motion.yrel));
 			}
 			sdlmsg_mousemotion(&m,
 				scale_mouseX(event->motion.x),

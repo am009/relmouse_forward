@@ -2,16 +2,33 @@
 
 Send relative mouse movements and keyboard key strokes to remote computer. Used with RDP to play games.
 
+https://docs.microsoft.com/en-us/answers/questions/238563/rdp-relative-mouse-movement-support-urgently-neede.html
+
 Based on [GamingAnywhere](https://github.com/chunying/gaminganywhere)
+
+远程桌面软件都用的是绝对鼠标逻辑，减少需要发生的包数目。而FPS游戏需要相对的鼠标移动，导致游戏视角无法移动。因此直接捕获本地鼠标的相对移动发送到远程。
 
 注意要用管理员权限启动。不然无法影响高权限窗口。
 
-TODO 将公用代码移动到dll里，设置依赖然后共享。清理无关代码。
+### 用法
 
-TODO 设置窗口透明
+被控端启动server，设置ip为0.0.0.0 （监听）
+
+控制端设置IP为服务器的IP，启动后出现一个小的白色窗口捕获鼠标，按下`~`键释放鼠标，同时停止发送鼠标移动数据，但是会继续发送键盘数据。
+
+使用时先远程连接目标主机，然后启动本软件，将窗口放到角落，再设置为前台。
+
+缺点：需要设置窗口为前台。
+
+默认使用UDP协议
+
+TODO 增加更多命令行选项
+
+TODO 将公用代码移动到dll里，设置依赖然后共享。
 
 TODO IPv6支持
 
+Done 设置窗口透明
 
 ## log
 
