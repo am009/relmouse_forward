@@ -18,17 +18,19 @@ Based on [GamingAnywhere](https://github.com/chunying/gaminganywhere)
 
 使用时先远程连接目标主机，然后启动本软件，将窗口放到角落，再设置为前台。
 
-缺点：需要设置窗口为前台。
+缺点：需要设置窗口为前台。另外在RDP还是看不到鼠标。。。
 
-默认使用UDP协议
-
-TODO 增加更多命令行选项
+使用UDP协议
 
 TODO 将公用代码移动到dll里，设置依赖然后共享。
 
-TODO 监听`[::]`时支持ipv6/ipv4双栈。
-
 TODO try next addr in getaddrinfo ctrladdr list
+
+TODO support tcp
+
+Done 增加命令行选项支持
+
+Done 监听`[::]`时支持ipv6/ipv4双栈。
 
 Done IPv6支持
 

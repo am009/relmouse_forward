@@ -46,6 +46,7 @@
 //#endif
 
 #include "ga-win32.h"
+#include <string>
 
 /** Enable audio subsystem? */
 #define	ENABLE_AUDIO
@@ -75,5 +76,7 @@ EXPORT int	ga_error(const char *fmt, ...);
 //EXPORT int	ga_alignment(void *ptr, int alignto);
 EXPORT long	ga_gettid();
 int winsock_init();
+char* getCmdOption(char** begin, char** end, const std::string& option);
+bool cmdOptionExists(char** begin, char** end, const std::string& option);
 
 #endif

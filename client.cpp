@@ -16,12 +16,16 @@ int config_ctrlproto = IPPROTO_UDP;
 const char* config_ctrlport = "8555";
 const char* config_server_name = NULL;
 const char* config_log_file = NULL;
-bool config_debug = true;
-float config_opacity = 0.2f;
+float config_opacity = 0.2f; // window default transparency
+bool config_debug =
+#ifdef _DEBUG
+true;
+#else
+false;
+#endif
 
 bool config_full_screen = false;
 bool config_relative_mouse = true;
-bool config_log = true;
 bool eventloop_running = true;
 int showCursor = 0;
 
@@ -32,12 +36,34 @@ SDL_Window* window = NULL;
 
 extern "C" int SDL_main(int argc, char* argv[])
 {
-	if (argc < 2) {
-		printf("please input IP address as argument.\n");
+	if (cmdOptionExists(argv, argv + argc, "-h") || cmdOptionExists(argv, argv + argc, "--help"))
+	{
+		puts("github.com/am009/relmouse-forward client");
+		puts("Send relative mouse movements and keyboard key strokes to remote computer. Used with RDP to play games.");
+		puts("Default port 8555");
+		puts("server.exe -s [server_ip] -p [port]");
 		return 0;
 	}
-	config_server_name = argv[1];
-	printf("server addr: %s\n", config_server_name);
+	config_server_name = getCmdOption(argv, argv + argc, "-s");
+	if (config_server_name == NULL) {
+		printf("please specify server IP address using -s.\n");
+		return 0;
+	}
+	char* port = getCmdOption(argv, argv + argc, "-p");
+	if (port != NULL) {
+		config_ctrlport = port;
+	}
+	if (cmdOptionExists(argv, argv + argc, "--debug")) {
+		config_debug = true;
+	}
+	if (cmdOptionExists(argv, argv + argc, "--nodebug")) {
+		config_debug = false;
+	}
+	// probably not working
+	if (cmdOptionExists(argv, argv + argc, "--tcp")) {
+		config_ctrlproto = IPPROTO_TCP;
+	}
+	printf("server addr: %s, server_port: %s\n", config_server_name, config_ctrlport);
 
 	ga_set_process_dpi_aware();
 	winsock_init();
@@ -187,7 +213,7 @@ ProcessEvent(SDL_Event* event) {
 				0/*event->key.keysym.unicode*/);
 			ctrl_client_sendmsg(&m, sizeof(sdlmsg_keyboard_t));
 		}
-		if (config_log) {
+		if (config_debug) {
 			gettimeofday(&tv, NULL);
 			printf("KEY-UP: %u.%06u scan 0x%04x sym 0x%04x mod 0x%04x\n",
 				tv.tv_sec, tv.tv_usec,
@@ -209,7 +235,7 @@ ProcessEvent(SDL_Event* event) {
 				0/*event->key.keysym.unicode*/);
 			ctrl_client_sendmsg(&m, sizeof(sdlmsg_keyboard_t));
 		}
-		if (config_log) {
+		if (config_debug) {
 			gettimeofday(&tv, NULL);
 			printf("KEY-DN: %u.%06u scan 0x%04x sym 0x%04x mod 0x%04x\n",
 				tv.tv_sec, tv.tv_usec,

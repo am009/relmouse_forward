@@ -12,19 +12,43 @@ int config_ctrlproto = IPPROTO_UDP;
 const char* config_ctrlport = "8555";
 const char* config_server_name = NULL;
 const char* config_log_file = NULL;
-bool config_debug = true;
+bool config_debug =
+#ifdef _DEBUG
+true;
+#else
+false;
+#endif
+
 
 int main(int argc, char* argv[])
 {
-	if (argc < 2) {
-		//printf("please input IP address as argument.\n");
-		//return 0;
+	if (cmdOptionExists(argv, argv + argc, "-h") || cmdOptionExists(argv, argv + argc, "--help"))
+	{
+		puts("github.com/am009/relmouse-forward server");
+		puts("Send relative mouse movements and keyboard key strokes to remote computer. Used with RDP to play games.");
+		puts("Default to listening all, port 8555");
+		puts("server.exe -b [ip_addr_to_bind] -p [port]");
+		return 0;
+	}
+	config_server_name = getCmdOption(argv, argv + argc, "-b");
+	if (config_server_name == NULL) {
 		printf("no bind address(argv[1]) provided, defaulting to all.\n");
 	}
-	else {
-		config_server_name = argv[1];
-		printf("server addr: %s\n", config_server_name);
+	char* port = getCmdOption(argv, argv + argc, "-p");
+	if (port != NULL) {
+		config_ctrlport = port;
 	}
+	if (cmdOptionExists(argv, argv + argc, "--debug")) {
+		config_debug = true;
+	}
+	if (cmdOptionExists(argv, argv + argc, "--nodebug")) {
+		config_debug = false;
+	}
+	// probably not working
+	if (cmdOptionExists(argv, argv + argc, "--tcp")) {
+		config_ctrlproto = IPPROTO_TCP;
+	}
+	printf("bind addr: %s, port: %s\n", config_server_name, config_ctrlport);
 
 	winsock_init();
 	sdlmsg_replay_init(NULL);
@@ -45,14 +69,3 @@ int main(int argc, char* argv[])
 	// End the program
 	return 0;
 }
-
-// 运行程序: Ctrl + F5 或调试 >“开始执行(不调试)”菜单
-// 调试程序: F5 或调试 >“开始调试”菜单
-
-// 入门使用技巧: 
-//   1. 使用解决方案资源管理器窗口添加/管理文件
-//   2. 使用团队资源管理器窗口连接到源代码管理
-//   3. 使用输出窗口查看生成输出和其他消息
-//   4. 使用错误列表窗口查看错误
-//   5. 转到“项目”>“添加新项”以创建新的代码文件，或转到“项目”>“添加现有项”以将现有代码文件添加到项目
-//   6. 将来，若要再次打开此项目，请转到“文件”>“打开”>“项目”并选择 .sln 文件

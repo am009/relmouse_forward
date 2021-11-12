@@ -226,6 +226,16 @@ ctrl_socket_init(bool isServer) {
 		printf("Error at socket(): %ld\n", WSAGetLastError());
 		return -1;
 	}
+	// set dual stack when listening to all(no argv[1])
+	if (isServer && ctrladdr->ai_family == PF_INET6 && config_server_name == NULL) {
+		DWORD val = 0;
+		if (setsockopt(ctrlsocket, IPPROTO_IPV6, IPV6_V6ONLY, (char*)&val, sizeof(val)) < 0) {
+			ga_error("server-socket ipv6/4 dualstack failed: %d\n", WSAGetLastError());
+		}
+		else {
+			ga_error("ipv6/4 dualstack enabled\n");
+		}
+	}
 
 	//bzero(&ctrlsin, sizeof(struct sockaddr_in));
 	//ctrlsin.sin_family = AF_INET;
