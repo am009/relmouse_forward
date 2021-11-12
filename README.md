@@ -26,7 +26,11 @@ TODO 增加更多命令行选项
 
 TODO 将公用代码移动到dll里，设置依赖然后共享。
 
-TODO IPv6支持
+TODO 监听`[::]`时支持ipv6/ipv4双栈。
+
+TODO try next addr in getaddrinfo ctrladdr list
+
+Done IPv6支持
 
 Done 设置窗口透明
 

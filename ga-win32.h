@@ -124,6 +124,7 @@ EXPORT void ga_win32_fill_bitmap_info(BITMAPINFO *pinfo, int w, int h, int bitsP
 EXPORT long long pcdiff_us(LARGE_INTEGER t1, LARGE_INTEGER t2, LARGE_INTEGER freq);
 
 EXPORT int ga_set_process_dpi_aware();
+LPSTR PrintError(int ErrorCode);
 
 #endif	/* USE_GA_WIN32_MACRO */
 /////////////////////////////////////////////////////////////////////////

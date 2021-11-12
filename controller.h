@@ -46,7 +46,7 @@ EXPORT	struct queuemsg *	ctrl_queue_read_msg();
 EXPORT	int			ctrl_queue_write_msg(void *msg, int msgsize);
 EXPORT	void			ctrl_queue_clear();
 
-EXPORT	SOCKET	ctrl_socket_init();
+EXPORT	SOCKET	ctrl_socket_init(bool isServer);
 
 EXPORT	int	    ctrl_client_init(const char *ctrlid);
 EXPORT	void*	ctrl_client_thread(void*);

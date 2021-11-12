@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <string.h>
 #include <pthread.h>
+#include <ws2tcpip.h>
 
 #include "controller.h"
 #include "config.h"
@@ -35,7 +36,7 @@ static bool ctrlenabled = true;
 static pthread_mutex_t wakeup_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t wakeup = PTHREAD_COND_INITIALIZER;
 static SOCKET ctrlsocket = -1;
-static struct sockaddr_in ctrlsin;
+static struct addrinfo* ctrladdr = NULL;
 // message queue
 static pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int qhead, qtail, qsize, qunit;
@@ -172,33 +173,72 @@ ctrl_queue_clear() {
 
 ////////////////////////////////////////////////////////////////////
 
+// https://github.com/MicrosoftDocs/win32/blob/docs/desktop-src/WinSock/creating-a-socket-for-the-server.md
 SOCKET
-ctrl_socket_init() {
+ctrl_socket_init(bool isServer) {
 	//
-	if(config_ctrlproto == IPPROTO_TCP) {
-		ctrlsocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	} else if(config_ctrlproto == IPPROTO_UDP) {
-		ctrlsocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	} else {
+	//if(config_ctrlproto == IPPROTO_TCP) {
+	//	ctrlsocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	//} else if(config_ctrlproto == IPPROTO_UDP) {
+	//	ctrlsocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	//} else {
+	//	ga_error("Controller socket-init: not supported protocol.\n");
+	//	return -1;
+	//}
+	//if(ctrlsocket < 0) {
+	//	ga_error("Controller socket-init: %s\n", strerror(errno));
+	//}
+	//
+	struct addrinfo hints;
+
+	ZeroMemory(&hints, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	if (config_ctrlproto == IPPROTO_TCP) {
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_TCP;
+	}
+	else if (config_ctrlproto == IPPROTO_UDP) {
+		hints.ai_socktype = SOCK_DGRAM;
+		hints.ai_protocol = IPPROTO_UDP;
+	}
+	else {
 		ga_error("Controller socket-init: not supported protocol.\n");
 		return -1;
 	}
-	if(ctrlsocket < 0) {
-		ga_error("Controller socket-init: %s\n", strerror(errno));
+	if (isServer) {
+		hints.ai_flags = AI_PASSIVE;
 	}
-	//
-	bzero(&ctrlsin, sizeof(struct sockaddr_in));
-	ctrlsin.sin_family = AF_INET;
-	ctrlsin.sin_port = htons(config_ctrlport);
-	if(config_server_name != NULL) {
-		ctrlsin.sin_addr.s_addr = name_resolve(config_server_name);
-		if(ctrlsin.sin_addr.s_addr == INADDR_NONE) {
-			ga_error("Name resolution failed: %s\n", config_server_name);
-			return -1;
-		}
+
+	// Resolve the local address and port to be used by the server
+	int iResult = getaddrinfo(config_server_name, config_ctrlport, &hints, &ctrladdr);
+	if (iResult != 0) {
+		printf("getaddrinfo failed: %d\n", iResult);
+		return -1;
 	}
-	ga_error("controller socket: socket address [%s:%u]\n",
-		inet_ntoa(ctrlsin.sin_addr), ntohs(ctrlsin.sin_port));
+
+	if (ctrladdr->ai_family == PF_INET6) {
+		ga_error("Using ipv6 socket\n");
+	}
+
+	ctrlsocket = socket(ctrladdr->ai_family, ctrladdr->ai_socktype, ctrladdr->ai_protocol);
+	if (ctrlsocket == INVALID_SOCKET) {
+		freeaddrinfo(ctrladdr);
+		printf("Error at socket(): %ld\n", WSAGetLastError());
+		return -1;
+	}
+
+	//bzero(&ctrlsin, sizeof(struct sockaddr_in));
+	//ctrlsin.sin_family = AF_INET;
+	//ctrlsin.sin_port = htons(config_ctrlport);
+	//if(config_server_name != NULL) {
+	//	ctrlsin.sin_addr.s_addr = name_resolve(config_server_name);
+	//	if(ctrlsin.sin_addr.s_addr == INADDR_NONE) {
+	//		ga_error("Name resolution failed: %s\n", config_server_name);
+	//		return -1;
+	//	}
+	//}
+	//ga_error("controller socket: socket address [%s:%u]\n",
+	//	inet_ntoa(ctrlsin.sin_addr), ntohs(ctrlsin.sin_port));
 
 	return ctrlsocket;
 }
@@ -207,16 +247,18 @@ ctrl_socket_init() {
 
 int
 ctrl_client_init(const char *ctrlid) {
-	if(ctrl_socket_init() < 0) {
+	if(ctrl_socket_init(false) < 0) {
 		return -1;
 	}
 	if(config_ctrlproto == IPPROTO_TCP) {
 		struct ctrlhandshake hh;
 		// connect to the server
-		if(connect(ctrlsocket, (struct sockaddr*) &ctrlsin, sizeof(ctrlsin)) < 0) {
+		if(connect(ctrlsocket, ctrladdr->ai_addr, (int)ctrladdr->ai_addrlen) < 0) {
 			ga_error("controller client-connect: %s\n", strerror(errno));
 			goto error;
 		}
+		// TODO try next addr in getaddrinfo ctrladdr list
+		freeaddrinfo(ctrladdr);
 		// send handshake
 		hh.length = 1+strlen(ctrlid)+1;	// msg total len, id, null-terminated
 		if(hh.length > sizeof(hh))
@@ -231,7 +273,7 @@ ctrl_client_init(const char *ctrlid) {
 error:
 	ctrlenabled = false;
 	ga_error("controller client: controller disabled.\n");
-	close(ctrlsocket);
+	closesocket(ctrlsocket);
 	ctrlsocket = -1;
 	return -1;
 }
@@ -273,7 +315,7 @@ ctrl_client_thread(void*) {
 						printf("%d\n", msg->msgtype);
 					}
 				}
-				if((wlen = sendto(ctrlsocket, (char*) qm->msg, qm->msgsize, 0, (struct sockaddr*) &ctrlsin, sizeof(ctrlsin))) < 0) {
+				if((wlen = sendto(ctrlsocket, (char*) qm->msg, qm->msgsize, 0, ctrladdr->ai_addr, (int)ctrladdr->ai_addrlen)) < 0) {
 					ga_error("controller client-send(udp): %s\n", strerror(errno));
 					exit(-1);
 				}
@@ -309,11 +351,12 @@ ctrl_client_sendmsg(void *msg, int msglen) {
 
 int
 ctrl_server_init(const char *ctrlid) {
-	if(ctrl_socket_init() < 0)
+	if(ctrl_socket_init(true) < 0)
 		return -1;
 	myctrlid = strdup(ctrlid);
 	// reuse port
 	do {
+		// TODO
 		int val = 1;
 		if(setsockopt(ctrlsocket, SOL_SOCKET, SO_REUSEADDR, (char*) &val, sizeof(val)) < 0) {
 			ga_error("controller server-bind reuse port: %d\n", WSAGetLastError());
@@ -321,20 +364,22 @@ ctrl_server_init(const char *ctrlid) {
 		}
 	} while(0);
 	// bind for either TCP of UDP
-	if(bind(ctrlsocket, (struct sockaddr*) &ctrlsin, sizeof(ctrlsin)) < 0) {
-		ga_error("controller server-bind: %s\n", strerror(errno));
+	if(bind(ctrlsocket, ctrladdr->ai_addr, (int)ctrladdr->ai_addrlen) < 0) {
+		ga_error("bind failed with error: %d\n", WSAGetLastError());
 		goto error;
 	}
+	freeaddrinfo(ctrladdr);
 	// TCP listen
 	if(config_ctrlproto == IPPROTO_TCP) {
-		if(listen(ctrlsocket, 16) < 0) {
-			ga_error("controller server-listen: %s\n", strerror(errno));
+		if(listen(ctrlsocket, SOMAXCONN) == SOCKET_ERROR) {
+			ga_error("controller server-listen: %ld\n", WSAGetLastError());
 			goto error;
 		}
 	}
 	return 0;
 error:
-	close(ctrlsocket);
+	freeaddrinfo(ctrladdr);
+	closesocket(ctrlsocket);
 	ctrlsocket = -1;
 	return -1;
 }
@@ -348,9 +393,12 @@ ctrl_server_setreplay(msgfunc callback) {
 
 void*
 ctrl_server_thread(void* ) {
-	struct sockaddr_in csin, xsin;
+	char Hostname[NI_MAXHOST];
+	SOCKADDR_STORAGE From;
+	int FromLen = 0;
+	SOCKADDR_STORAGE From2;
+	int From2Len = 0;
 	SOCKET socket;
-	int csinlen, xsinlen;
 	int clientaccepted = 0;
 	//
 	unsigned char buf[8192];
@@ -364,20 +412,23 @@ ctrl_server_thread(void* ) {
 	ga_error("controller server started: tid=%ld.\n", ga_gettid());
 
 restart:
-	bzero(&csin, sizeof(csin));
-	csinlen = sizeof(csin);
-	csin.sin_family = AF_INET;
 	clientaccepted = 0;
 	// handle only one client
 	if(config_ctrlproto == IPPROTO_TCP) {
 		struct ctrlhandshake *hh = (struct ctrlhandshake*) buf;
-		//
-		if((socket = accept(ctrlsocket, (struct sockaddr*) &csin, &csinlen)) < 0) {
-			ga_error("controller server-accept: %s.\n", strerror(errno));
-			goto restart;
+
+		if((socket = accept(ctrlsocket, (LPSOCKADDR)&From, &FromLen)) == INVALID_SOCKET) {
+			ga_error("controller server-accept failed: %d.\n", WSAGetLastError());
+			closesocket(ctrlsocket);
+			WSACleanup();
+			exit(-1);
+			// goto restart;
 		}
-		ga_error("controller server-thread: accepted TCP client from %s.%d\n",
-			inet_ntoa(csin.sin_addr), ntohs(csin.sin_port));
+		// https://docs.microsoft.com/en-us/windows/win32/winsock/ipv6-enabled-server-code-2
+		if (getnameinfo((LPSOCKADDR)&From, FromLen, Hostname,
+			sizeof(Hostname), NULL, 0, NI_NUMERICHOST) != 0)
+			strcpy_s(Hostname, NI_MAXHOST, "<unknown>");
+		printf("\nAccepted connection from %s\n", Hostname);
 		// check initial handshake message
 		if((buflen = recv(socket, (char*) buf, sizeof(buf), 0)) <= 0) {
 			ga_error("controller server-thread: %s\n", strerror(errno));
@@ -403,6 +454,7 @@ restart:
 	buflen = 0;
 
 	while(true) {
+		FromLen = sizeof(From);
 		int rlen, msglen;
 		//
 		bufhead = 0;
@@ -417,16 +469,18 @@ tcp_readmore:
 			}
 			buflen += rlen;
 		} else if(config_ctrlproto == IPPROTO_UDP) {
-			bzero(&xsin, sizeof(xsin));
-			xsinlen = sizeof(xsin);
-			xsin.sin_family = AF_INET;
-			buflen = recvfrom(ctrlsocket, (char*) buf, sizeof(buf), 0, (struct sockaddr*) &xsin, &xsinlen);
+			buflen = recvfrom(ctrlsocket, (char*) buf, sizeof(buf), 0, (LPSOCKADDR)&From, &FromLen);
+			if (buflen == SOCKET_ERROR) {
+				ga_error("recvfrom() failed with error %d: %s\n",
+					WSAGetLastError(), PrintError(WSAGetLastError()));
+				goto restart;
+			}
 			if(clientaccepted == 0) {
-				bcopy(&xsin, &csin, sizeof(csin));
+				bcopy(&From, &From2, sizeof(From));
 				clientaccepted = 1;
-			} else if(memcmp(&csin, &xsin, sizeof(csin)) != 0) {
+			} else if(memcmp(&From, &From2, sizeof(From)) != 0) {
 				ga_error("controller server-thread: NOTICE - UDP client reconnected?\n");
-				bcopy(&xsin, &csin, sizeof(csin));
+				bcopy(&From, &From2, sizeof(From));
 				//continue;
 			}
 		}

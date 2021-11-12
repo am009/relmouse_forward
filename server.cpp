@@ -9,19 +9,22 @@
 #include "controller.h"
 
 int config_ctrlproto = IPPROTO_UDP;
-USHORT config_ctrlport = 8555;
-const char* config_server_name = "0.0.0.0";
+const char* config_ctrlport = "8555";
+const char* config_server_name = NULL;
 const char* config_log_file = NULL;
-bool config_debug = false;
+bool config_debug = true;
 
 int main(int argc, char* argv[])
 {
 	if (argc < 2) {
-		printf("please input IP address as argument.\n");
-		return 0;
+		//printf("please input IP address as argument.\n");
+		//return 0;
+		printf("no bind address(argv[1]) provided, defaulting to all.\n");
 	}
-	config_server_name = argv[1];
-	printf("server addr: %s\n", config_server_name);
+	else {
+		config_server_name = argv[1];
+		printf("server addr: %s\n", config_server_name);
+	}
 
 	winsock_init();
 	sdlmsg_replay_init(NULL);

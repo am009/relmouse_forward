@@ -35,6 +35,22 @@
 
 typedef unsigned __int64 u_int64_t;
 
+// https://docs.microsoft.com/en-us/windows/win32/winsock/ipv6-enabled-server-code-2
+LPSTR PrintError(int ErrorCode)
+{
+	static char Message[1024];
+
+	// If this program was multithreaded, we'd want to use
+	// FORMAT_MESSAGE_ALLOCATE_BUFFER instead of a static buffer here.
+	// (And of course, free the buffer when we were done with it)
+
+	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS |
+		FORMAT_MESSAGE_MAX_WIDTH_MASK, NULL, ErrorCode,
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		(LPSTR)Message, 1024, NULL);
+	return Message;
+}
+
 /**
  * Convert Windows FILETIME to UNIX timestamp. This is an internal function.
  *

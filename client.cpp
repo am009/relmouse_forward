@@ -13,8 +13,8 @@ void
 ProcessEvent(SDL_Event* event);
 
 int config_ctrlproto = IPPROTO_UDP;
-USHORT config_ctrlport = 8555;
-const char* config_server_name = "127.0.0.1";
+const char* config_ctrlport = "8555";
+const char* config_server_name = NULL;
 const char* config_log_file = NULL;
 bool config_debug = true;
 float config_opacity = 0.2f;
